@@ -112,5 +112,5 @@ def rpc_call(payload):
 
 
 if __name__ == '__main__':
-    RPC_CLIENT = RpcClient('127.0.0.1', 'guest', 'guest', 'rpc_queue')
+    RPC_CLIENT = RpcClient('	jaragua-01.lmq.cloudamqp.com', 'xguypqlh', 'FywGOTaF_vYoLWQEatP1WTakBoG1X4Qs', 'rpc_queue')
     app.run()
