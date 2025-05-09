@@ -25,9 +25,9 @@ For questions feel free to email me: me@eandersson.net
 """
 __author__ = 'eandersson'
 
+import os
 import threading
 from time import sleep
-
 from flask import Flask
 
 import amqpstorm
@@ -56,7 +56,7 @@ class RpcClient(object):
             self.host,
             self.username,
             self.password,
-            virtual_host='xguypqlh'  # ← Aquí se añade el virtual host
+            virtual_host='xguypqlh'  # Virtual host de CloudAMQP
         )
         self.channel = self.connection.channel()
         self.channel.queue.declare(self.rpc_queue)
@@ -71,7 +71,7 @@ class RpcClient(object):
          to RPC requests.
         """
         thread = threading.Thread(target=self._process_data_events)
-        thread.setDaemon(True)
+        thread.daemon = True  # ← Corrección aquí
         thread.start()
 
     def _process_data_events(self):
@@ -123,4 +123,5 @@ if __name__ == '__main__':
         rpc_queue='rpc_queue'
     )
 
-    app.run()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
