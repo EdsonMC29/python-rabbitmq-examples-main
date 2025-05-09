@@ -1,2 +1,3 @@
-Flask
-amqpstorm
+Flask==2.3.3
+amqpstorm==2.10.4
+
