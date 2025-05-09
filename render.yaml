@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: flask-rpc-service
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python amqpstorm_threaded_rpc_client.py
