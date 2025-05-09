@@ -1,6 +1,10 @@
 services:
   - type: web
-    name: flask-rpc-service
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python amqpstorm_threaded_rpc_client.py
+    name: flask-rpc
+    runtime: python
+    buildCommand: "pip3 install -r requirements.txt"
+    startCommand: "python3 amqpstorm_threaded_rpc_client.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
+
