@@ -112,5 +112,11 @@ def rpc_call(payload):
 
 
 if __name__ == '__main__':
-    RPC_CLIENT = RpcClient('jaragua-01.lmq.cloudamqp.com', 'xguypqlh', 'FywGOTaF_vYoLWQEatP1WTakBoG1X4Qs', 'rpc_queue')
+    RPC_CLIENT = RpcClient(
+    host='jaragua.lmq.cloudamqp.com',
+    username='xguypqlh',
+    password='FywGOTaF_vYoLWQEatP1WTakBoG1X4Qs',
+    rpc_queue='rpc_queue'
+)
+
     app.run()
