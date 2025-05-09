@@ -52,8 +52,12 @@ class RpcClient(object):
 
     def open(self):
         """Open Connection."""
-        self.connection = amqpstorm.Connection(self.host, self.username,
-                                               self.password)
+        self.connection = amqpstorm.Connection(
+            self.host,
+            self.username,
+            self.password,
+            virtual_host='xguypqlh'  # ← Aquí se añade el virtual host
+        )
         self.channel = self.connection.channel()
         self.channel.queue.declare(self.rpc_queue)
         result = self.channel.queue.declare(exclusive=True)
@@ -113,10 +117,10 @@ def rpc_call(payload):
 
 if __name__ == '__main__':
     RPC_CLIENT = RpcClient(
-    host='jaragua.lmq.cloudamqp.com',
-    username='xguypqlh',
-    password='FywGOTaF_vYoLWQEatP1WTakBoG1X4Qs',
-    rpc_queue='rpc_queue'
-)
+        host='jaragua.lmq.cloudamqp.com',
+        username='xguypqlh',
+        password='FywGOTaF_vYoLWQEatP1WTakBoG1X4Qs',
+        rpc_queue='rpc_queue'
+    )
 
     app.run()
