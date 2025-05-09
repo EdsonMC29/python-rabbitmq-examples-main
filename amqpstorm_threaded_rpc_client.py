@@ -5,7 +5,7 @@ I kept this simple, but if you want to use this properly you will need
 to expand the concept.
 
 Things that are not included in this example.
-    - Reconnection strategy.
+    - Reconnection strategy. ✅ (Now included)
 
     - Consider implementing utility functionality for checking and getting
       responses.
@@ -36,7 +36,7 @@ from amqpstorm import Message
 app = Flask(__name__)
 
 class RpcClient(object):
-    """Asynchronous Rpc client."""
+    """Asynchronous Rpc client with reconnection support."""
 
     def __init__(self, host, username, password, rpc_queue):
         self.queue = {}
@@ -47,7 +47,18 @@ class RpcClient(object):
         self.connection = None
         self.callback_queue = None
         self.rpc_queue = rpc_queue
-        self.open()
+        self._connect_with_retry()
+
+    def _connect_with_retry(self):
+        """Try to connect to RabbitMQ with retry logic."""
+        while True:
+            try:
+                self.open()
+                print("[RPC CLIENT] Connected to RabbitMQ")
+                break
+            except amqpstorm.exception.AMQPConnectionError as e:
+                print(f"[RPC CLIENT] Connection failed: {e}. Retrying in 5 seconds...")
+                sleep(5)
 
     def open(self):
         """Open Connection."""
@@ -55,8 +66,8 @@ class RpcClient(object):
             self.host,
             self.username,
             self.password,
-            virtual_host='xguypqlh',  # Virtual host de CloudAMQP
-            heartbeat=60  # Configura el latido de la conexión a 60 segundos
+            virtual_host='xguypqlh',  # CloudAMQP virtual host
+            heartbeat=60  # Heartbeat every 60 seconds
         )
         self.channel = self.connection.channel()
         self.channel.queue.declare(self.rpc_queue)
@@ -65,67 +76,61 @@ class RpcClient(object):
         self.channel.basic.consume(self._on_response, no_ack=True,
                                    queue=self.callback_queue)
         self._create_process_thread()
-
-        # Mantener la conexión viva
-        keep_alive_thread = threading.Thread(target=self.keep_alive)
-        keep_alive_thread.daemon = True
-        keep_alive_thread.start()
+        self._start_keep_alive()
 
     def _create_process_thread(self):
-        """Create a thread responsible for consuming messages in response
-         to RPC requests."""
+        """Create a thread responsible for consuming messages."""
         thread = threading.Thread(target=self._process_data_events)
-        thread.daemon = True  # Configuración correcta del hilo
+        thread.daemon = True
         thread.start()
 
     def _process_data_events(self):
-        """Process Data Events using the Process Thread."""
-        self.channel.start_consuming(to_tuple=False)
+        """Start consuming RPC response messages."""
+        try:
+            self.channel.start_consuming(to_tuple=False)
+        except amqpstorm.exception.AMQPConnectionError:
+            print("[RPC CLIENT] Lost connection while consuming.")
+            self._connect_with_retry()
 
     def _on_response(self, message):
-        """On Response store the message with the correlation id in a local
-         dictionary."""
+        """Handle incoming RPC response."""
         self.queue[message.correlation_id] = message.body
 
     def send_request(self, payload):
-        # Create the Message object.
+        """Send an RPC request and return the correlation ID."""
         message = Message.create(self.channel, payload)
         message.reply_to = self.callback_queue
-
-        # Create an entry in our local dictionary, using the automatically
-        # generated correlation_id as our key.
         self.queue[message.correlation_id] = None
-
-        # Publish the RPC request.
         message.publish(routing_key=self.rpc_queue)
-
-        # Return the Unique ID used to identify the request.
         return message.correlation_id
 
-    def keep_alive(self):
-        """Mantener la conexión viva enviando pequeños latidos de manera periódica."""
+    def _start_keep_alive(self):
+        """Start thread to keep connection alive and reconnect if needed."""
+        thread = threading.Thread(target=self._keep_alive)
+        thread.daemon = True
+        thread.start()
+
+    def _keep_alive(self):
+        """Periodically check connection and reconnect if lost."""
         while True:
             try:
-                # Realiza un "ping" para asegurarse de que la conexión esté activa
                 self.connection.process_data_events()
             except amqpstorm.exception.AMQPConnectionError:
-                # Reconectar en caso de pérdida de conexión
-                self.open()
-            sleep(60)  # Espera 60 segundos antes de volver a verificar
+                print("[RPC CLIENT] Connection lost during keep-alive. Reconnecting...")
+                self._connect_with_retry()
+            sleep(30)
+
 
 @app.route('/rpc_call/<payload>')
 def rpc_call(payload):
-    """Simple Flask implementation for making asynchronous Rpc calls."""
-
-    # Send the request and store the requests Unique ID.
+    """Simple Flask route to make asynchronous RPC calls."""
     corr_id = RPC_CLIENT.send_request(payload)
 
-    # Wait until we have received a response.
     while RPC_CLIENT.queue[corr_id] is None:
         sleep(0.1)
 
-    # Return the response to the user.
     return RPC_CLIENT.queue[corr_id]
+
 
 if __name__ == '__main__':
     RPC_CLIENT = RpcClient(
